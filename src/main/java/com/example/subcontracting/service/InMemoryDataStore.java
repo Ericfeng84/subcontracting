@@ -41,12 +41,22 @@ public class InMemoryDataStore {
     public static final String ID_FG_DOOR_R = "FG_DOOR_R";
     public static final String ID_FG_DOOR_PAIR = "FG_DOOR_PAIR";
 
+    // Define new Product IDs for MAX pairing
+    public static final String ID_FG_DOOR_L_MAX = "FG_DOOR_L_MAX";
+    public static final String ID_FG_DOOR_R_MAX = "FG_DOOR_R_MAX";
+    public static final String ID_FG_DOOR_PAIR_MAX = "FG_DOOR_PAIR_MAX";
+
     public static final Product RAW_MATERIAL_DOOR_CORE = new Product(ID_RAW_MATERIAL_DOOR_CORE, "门芯原材料", Product.ProductType.RAW_MATERIAL);
     public static final Product RAW_MATERIAL_HINGE = new Product(ID_RAW_MATERIAL_HINGE, "铰链", Product.ProductType.RAW_MATERIAL);
 
     public static final Product FG_DOOR_L = new Product(ID_FG_DOOR_L, "左门 (委外成品)", Product.ProductType.FINISHED_GOOD);
     public static final Product FG_DOOR_R = new Product(ID_FG_DOOR_R, "右门 (委外成品)", Product.ProductType.FINISHED_GOOD);
     public static final Product FG_DOOR_PAIR = new Product(ID_FG_DOOR_PAIR, "左右门组合 (委外成品)", Product.ProductType.FINISHED_GOOD);
+
+    // Define new Product instances for MAX pairing
+    public static final Product FG_DOOR_L_MAX = new Product(ID_FG_DOOR_L_MAX, "左门 (MAX配对)", Product.ProductType.FINISHED_GOOD);
+    public static final Product FG_DOOR_R_MAX = new Product(ID_FG_DOOR_R_MAX, "右门 (MAX配对)", Product.ProductType.FINISHED_GOOD);
+    public static final Product FG_DOOR_PAIR_MAX = new Product(ID_FG_DOOR_PAIR_MAX, "左右门组合 (MAX配对)", Product.ProductType.FINISHED_GOOD);
 
 
     @PostConstruct
@@ -58,7 +68,12 @@ public class InMemoryDataStore {
         Product fgDoorR = new Product(ID_FG_DOOR_R, "右门 (委外成品)", Product.ProductType.FINISHED_GOOD);
         Product fgDoorPair = new Product(ID_FG_DOOR_PAIR, "左右门组合 (委外成品)", Product.ProductType.FINISHED_GOOD);
 
-        productRepository.saveAll(Arrays.asList(rawMaterialDoorCore, rawMaterialHinge, fgDoorL, fgDoorR, fgDoorPair));
+        // Add new MAX pairing products to repository
+        Product fgDoorLMax = new Product(ID_FG_DOOR_L_MAX, "左门 (MAX配对)", Product.ProductType.FINISHED_GOOD);
+        Product fgDoorRMax = new Product(ID_FG_DOOR_R_MAX, "右门 (MAX配对)", Product.ProductType.FINISHED_GOOD);
+        Product fgDoorPairMax = new Product(ID_FG_DOOR_PAIR_MAX, "左右门组合 (MAX配对)", Product.ProductType.FINISHED_GOOD);
+
+        productRepository.saveAll(Arrays.asList(rawMaterialDoorCore, rawMaterialHinge, fgDoorL, fgDoorR, fgDoorPair, fgDoorLMax, fgDoorRMax, fgDoorPairMax));
 
         // Define BOMs and save them
         BillOfMaterial bomDoorL = new BillOfMaterial(fgDoorL.getId(), fgDoorL, Arrays.asList(
@@ -79,11 +94,39 @@ public class InMemoryDataStore {
         ));
         billOfMaterialRepository.save(bomDoorPair);
 
+        // Define BOMs for MAX pairing products
+        BillOfMaterial bomDoorLMax = new BillOfMaterial(fgDoorLMax.getId(), fgDoorLMax, Arrays.asList(
+                new BomComponent(rawMaterialDoorCore, 1),
+                new BomComponent(rawMaterialHinge, 2)
+        ));
+        billOfMaterialRepository.save(bomDoorLMax);
+
+        BillOfMaterial bomDoorRMax = new BillOfMaterial(fgDoorRMax.getId(), fgDoorRMax, Arrays.asList(
+                new BomComponent(rawMaterialDoorCore, 1),
+                new BomComponent(rawMaterialHinge, 2)
+        ));
+        billOfMaterialRepository.save(bomDoorRMax);
+
+        // For MAX pairing, the combined BOM might be different or not strictly additive.
+        // This example assumes it's similar to the MIN pair for simplicity, but could be adjusted based on business logic.
+        // For example, if MAX pairing means taking all components from both, the quantities would be higher.
+        // Or, if it's about fulfilling an order for the MAX quantity of *either* L or R, the BOM for FG_DOOR_PAIR_MAX might represent the components for *one* of them, 
+        // and the pairing logic itself handles the quantity.
+        // For now, let's assume FG_DOOR_PAIR_MAX also has a BOM, perhaps representing a 'virtual' paired item for tracking.
+        BillOfMaterial bomDoorPairMax = new BillOfMaterial(fgDoorPairMax.getId(), fgDoorPairMax, Arrays.asList(
+                new BomComponent(rawMaterialDoorCore, 1), // Example: still one core
+                new BomComponent(rawMaterialHinge, 4)  // Example: still 4 hinges for a conceptual pair
+        ));
+        billOfMaterialRepository.save(bomDoorPairMax);
+
         // Define Pairing Rules and save them via repository
-        PairingRule doorPairRule = new PairingRule(null, ID_FG_DOOR_PAIR, ID_FG_DOOR_L, ID_FG_DOOR_R);
-        pairingRuleRepository.save(doorPairRule);
-        // You could add more rules here if needed for other product combinations
-        // e.g., pairingRuleRepository.save(new PairingRule(null, "COMBO_WHEEL_SET", "WHEEL_FRONT", "WHEEL_BACK"));
+        // Original MIN rule
+        PairingRule doorPairRuleMin = new PairingRule(null, ID_FG_DOOR_PAIR, ID_FG_DOOR_L, ID_FG_DOOR_R, PairingRule.PairingType.MIN);
+        pairingRuleRepository.save(doorPairRuleMin);
+
+        // New MAX rule example
+        PairingRule doorPairRuleMax = new PairingRule(null, ID_FG_DOOR_PAIR_MAX, ID_FG_DOOR_L_MAX, ID_FG_DOOR_R_MAX, PairingRule.PairingType.MAX);
+        pairingRuleRepository.save(doorPairRuleMax);
     }
 
     public Optional<Product> findProductById(String productId) {

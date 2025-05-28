@@ -33,33 +33,55 @@ public class SubcontractingService {
         for (OrderItemDto item : originalItems) {
             currentQuantities.merge(item.getProductId(), item.getQuantity(), Integer::sum);
         }
-
+    
         List<OrderItemDto> optimizedItems = new ArrayList<>();
-
+    
         // Apply pairing rules
         for (PairingRule rule : dataStore.getPairingRules()) {
             String child1Id = rule.getChild1ProductId();
             String child2Id = rule.getChild2ProductId();
             String pairId = rule.getPairProductId();
-
+            PairingRule.PairingType type = rule.getType();
+    
             int qtyChild1 = currentQuantities.getOrDefault(child1Id, 0);
             int qtyChild2 = currentQuantities.getOrDefault(child2Id, 0);
-
-            int numberOfPairs = Math.min(qtyChild1, qtyChild2);
-
+    
+            int numberOfPairs = 0;
+            int consumedChild1 = 0;
+            int consumedChild2 = 0;
+    
+            if (type == PairingRule.PairingType.MIN) {
+                numberOfPairs = Math.min(qtyChild1, qtyChild2);
+                consumedChild1 = numberOfPairs;
+                consumedChild2 = numberOfPairs;
+            } else if (type == PairingRule.PairingType.MAX) {
+                if (qtyChild1 > 0 || qtyChild2 > 0) { // Only form pairs if at least one child exists
+                    numberOfPairs = Math.max(qtyChild1, qtyChild2);
+                    // For MAX, we assume the pair can be formed up to the max quantity of either child.
+                    // The BOM for the pair product should reflect that it can be made even if one component is "virtually" supplied.
+                    // Or, the cost/material implication is handled differently for MAX pairs.
+                    // Here, we consume up to the available quantity of each child to form these MAX pairs.
+                    consumedChild1 = Math.min(qtyChild1, numberOfPairs); 
+                    consumedChild2 = Math.min(qtyChild2, numberOfPairs);
+                    // If one child's quantity is less than numberOfPairs, it means we are forming pairs
+                    // using all of that child and up to numberOfPairs of the other child.
+                    // The crucial part is that `numberOfPairs` defines how many `pairId` items are created.
+                } else {
+                    numberOfPairs = 0;
+                }
+            }
+    
             if (numberOfPairs > 0) {
-                // Add the pair item to optimized list
                 OrderItemDto pairItem = new OrderItemDto();
                 pairItem.setProductId(pairId);
                 pairItem.setQuantity(numberOfPairs);
                 optimizedItems.add(pairItem);
-
-                // Reduce quantities of child items
-                currentQuantities.put(child1Id, qtyChild1 - numberOfPairs);
-                currentQuantities.put(child2Id, qtyChild2 - numberOfPairs);
+    
+                currentQuantities.put(child1Id, qtyChild1 - consumedChild1);
+                currentQuantities.put(child2Id, qtyChild2 - consumedChild2);
             }
         }
-
+    
         // Add remaining individual items (those not fully consumed by pairing or not part of any rule)
         currentQuantities.forEach((productId, quantity) -> {
             if (quantity > 0) {

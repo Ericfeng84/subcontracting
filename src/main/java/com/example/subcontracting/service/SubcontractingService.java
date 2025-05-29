@@ -38,36 +38,35 @@ public class SubcontractingService {
     
         // Apply pairing rules
         for (PairingRule rule : dataStore.getPairingRules()) {
-            String child1Id = rule.getChild1ProductId();
-            String child2Id = rule.getChild2ProductId();
+            List<String> childIds = new ArrayList<>(rule.getChildProductIds());
             String pairId = rule.getPairProductId();
             PairingRule.PairingType type = rule.getType();
     
-            int qtyChild1 = currentQuantities.getOrDefault(child1Id, 0);
-            int qtyChild2 = currentQuantities.getOrDefault(child2Id, 0);
+            // 获取所有子件的当前数量
+            List<Integer> childQuantities = childIds.stream()
+                .map(id -> currentQuantities.getOrDefault(id, 0))
+                .collect(Collectors.toList());
     
             int numberOfPairs = 0;
-            int consumedChild1 = 0;
-            int consumedChild2 = 0;
+            Map<String, Integer> consumedQuantities = new HashMap<>();
     
             if (type == PairingRule.PairingType.MIN) {
-                numberOfPairs = Math.min(qtyChild1, qtyChild2);
-                consumedChild1 = numberOfPairs;
-                consumedChild2 = numberOfPairs;
+                // MIN类型：取所有子件中数量最小的值
+                numberOfPairs = childQuantities.stream().mapToInt(Integer::intValue).min().orElse(0);
+                // 每个子件消耗相同数量
+                for (String childId : childIds) {
+                    consumedQuantities.put(childId, numberOfPairs);
+                }
             } else if (type == PairingRule.PairingType.MAX) {
-                if (qtyChild1 > 0 || qtyChild2 > 0) { // Only form pairs if at least one child exists
-                    numberOfPairs = Math.max(qtyChild1, qtyChild2);
-                    // For MAX, we assume the pair can be formed up to the max quantity of either child.
-                    // The BOM for the pair product should reflect that it can be made even if one component is "virtually" supplied.
-                    // Or, the cost/material implication is handled differently for MAX pairs.
-                    // Here, we consume up to the available quantity of each child to form these MAX pairs.
-                    consumedChild1 = Math.min(qtyChild1, numberOfPairs); 
-                    consumedChild2 = Math.min(qtyChild2, numberOfPairs);
-                    // If one child's quantity is less than numberOfPairs, it means we are forming pairs
-                    // using all of that child and up to numberOfPairs of the other child.
-                    // The crucial part is that `numberOfPairs` defines how many `pairId` items are created.
-                } else {
-                    numberOfPairs = 0;
+                // MAX类型：只要有任何子件存在就可以形成配对
+                if (childQuantities.stream().anyMatch(qty -> qty > 0)) {
+                    // 取所有子件中数量最大的值
+                    numberOfPairs = childQuantities.stream().mapToInt(Integer::intValue).max().orElse(0);
+                    // 每个子件消耗其可用数量和配对数量中的较小值
+                    for (int i = 0; i < childIds.size(); i++) {
+                        consumedQuantities.put(childIds.get(i), 
+                            Math.min(childQuantities.get(i), numberOfPairs));
+                    }
                 }
             }
     
@@ -77,12 +76,15 @@ public class SubcontractingService {
                 pairItem.setQuantity(numberOfPairs);
                 optimizedItems.add(pairItem);
     
-                currentQuantities.put(child1Id, qtyChild1 - consumedChild1);
-                currentQuantities.put(child2Id, qtyChild2 - consumedChild2);
+                // 更新剩余数量
+                consumedQuantities.forEach((childId, consumed) -> {
+                    int remaining = currentQuantities.getOrDefault(childId, 0) - consumed;
+                    currentQuantities.put(childId, remaining);
+                });
             }
         }
     
-        // Add remaining individual items (those not fully consumed by pairing or not part of any rule)
+        // Add remaining individual items
         currentQuantities.forEach((productId, quantity) -> {
             if (quantity > 0) {
                 OrderItemDto remainingItem = new OrderItemDto();
@@ -92,8 +94,7 @@ public class SubcontractingService {
             }
         });
         
-        // Ensure no product is listed twice, sum quantities if necessary (though current logic should prevent this)
-        // This can be a safeguard or handle cases where originalItems had duplicates
+        // 确保没有重复的产品，如果有则合并数量
         return optimizedItems.stream()
                 .collect(Collectors.groupingBy(OrderItemDto::getProductId,
                          Collectors.summingInt(OrderItemDto::getQuantity)))
@@ -104,7 +105,7 @@ public class SubcontractingService {
                     item.setQuantity(entry.getValue());
                     return item;
                 })
-                .filter(item -> item.getQuantity() > 0) // Filter out zero quantity items
+                .filter(item -> item.getQuantity() > 0)
                 .collect(Collectors.toList());
     }
 

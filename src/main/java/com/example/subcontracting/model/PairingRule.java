@@ -5,20 +5,18 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.ManyToOne;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import lombok.AllArgsConstructor;
+import jakarta.persistence.FetchType;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 @Data
-// 删除@NoArgsConstructor注解，因为已经有了显式的无参构造函数
-// 移除@AllArgsConstructor注解，因为已经有了显式的构造函数
 @Entity
 public class PairingRule {
     @Id
@@ -26,33 +24,32 @@ public class PairingRule {
     private Long id;
 
     private String pairProductId;
-    private String child1ProductId;
-    private String child2ProductId;
+    
+    @ElementCollection(fetch = FetchType.EAGER)
+    private List<String> childProductIds = new ArrayList<>();
 
     @Enumerated(EnumType.STRING)
-    private PairingType type; // New field for pairing type
+    private PairingType type;
 
     public enum PairingType {
-        MIN, // Existing logic: min(child1, child2)
-        MAX  // New logic: max(child1, child2)
+        MIN, // 取所有子件中数量最小的值
+        MAX  // 取所有子件中数量最大的值
     }
 
-    // Constructor to include type
-    public PairingRule(Long id, String pairProductId, String child1ProductId, String child2ProductId, PairingType type) {
+    // 构造函数支持多个子件
+    public PairingRule(Long id, String pairProductId, List<String> childProductIds, PairingType type) {
         this.id = id;
         this.pairProductId = pairProductId;
-        this.child1ProductId = child1ProductId;
-        this.child2ProductId = child2ProductId;
+        this.childProductIds = childProductIds;
         this.type = type;
     }
 
-    // Default constructor for JPA
+    // JPA需要的默认构造函数
     public PairingRule() {
     }
 
-    // The getChildProductIds method is fine as a transient utility method
-    // It doesn't need to be persisted if child1ProductId and child2ProductId are stored.
+    // 获取所有子件ID的集合
     public Set<String> getChildProductIds() {
-        return new HashSet<>(Arrays.asList(child1ProductId, child2ProductId));
+        return new HashSet<>(childProductIds);
     }
 }

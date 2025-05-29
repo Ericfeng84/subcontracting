@@ -121,11 +121,11 @@ public class InMemoryDataStore {
 
         // Define Pairing Rules and save them via repository
         // Original MIN rule
-        PairingRule doorPairRuleMin = new PairingRule(null, ID_FG_DOOR_PAIR, ID_FG_DOOR_L, ID_FG_DOOR_R, PairingRule.PairingType.MIN);
+        PairingRule doorPairRuleMin = new PairingRule(null, ID_FG_DOOR_PAIR, Arrays.asList(ID_FG_DOOR_L, ID_FG_DOOR_R), PairingRule.PairingType.MIN);
         pairingRuleRepository.save(doorPairRuleMin);
 
         // New MAX rule example
-        PairingRule doorPairRuleMax = new PairingRule(null, ID_FG_DOOR_PAIR_MAX, ID_FG_DOOR_L_MAX, ID_FG_DOOR_R_MAX, PairingRule.PairingType.MAX);
+        PairingRule doorPairRuleMax = new PairingRule(null, ID_FG_DOOR_PAIR_MAX, Arrays.asList(ID_FG_DOOR_L_MAX, ID_FG_DOOR_R_MAX), PairingRule.PairingType.MAX);
         pairingRuleRepository.save(doorPairRuleMax);
     }
 

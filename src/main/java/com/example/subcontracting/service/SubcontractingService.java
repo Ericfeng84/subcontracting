@@ -154,4 +154,12 @@ public class SubcontractingService {
         );
         return result;
     }
+
+    // 新增：获取所有成品产品
+    public List<Product> getAllFinishedProducts() {
+        // 只返回成品类型
+        return dataStore.getAllProducts().stream()
+                .filter(p -> p.getType() == Product.ProductType.FINISHED_GOOD)
+                .toList();
+    }
 }

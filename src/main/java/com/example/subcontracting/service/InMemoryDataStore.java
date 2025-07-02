@@ -143,4 +143,9 @@ public class InMemoryDataStore {
     public List<PairingRule> getPairingRules() { // Getter for the rules
         return pairingRuleRepository.findAll(); // Retrieve all rules from the database
     }
+
+    // 新增：获取所有产品
+    public List<Product> getAllProducts() {
+        return productRepository.findAll();
+    }
 }
